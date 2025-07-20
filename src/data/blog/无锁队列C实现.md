@@ -8,18 +8,16 @@ draft: false
 ogImage: ../../assets/images/forrest-gump-quote.png
 tags:
   - lockfree
-description: How to update project dependencies and AstroPaper template.
+description: Linux共享内存和CAS原子操作示例
 ---
 
 ![Forrest Gump Fake Quote](@/assets/images/forrest-gump-quote.png)
-
-## Table of contents
 
 在分布式系统中经常会使用到共享内存，然后多个进程并行读写同一块共享内存，这样就会造成并发冲突的问题， 一般的常规做法是加锁，但是锁对性能的影响非常大，所以就搞出来了一个无锁队列。
 
 无锁队列的关键原理是CPU提供了一个指令CAS，这条指令是一个原子指令，执行过程中不允许被打断。 
 
-它接受三个参数：需要修改值的地址、旧值、新值；CAS指令执行时先读取该地址的当前值，将当前值于旧值进行比较， 如果相等则说明此值没有被修改过将当前值更新为新值，操作成功； 
+它接受三个参数：需要修改值的地址、旧值、新值；CAS指令执行时先读取该地址的当前值，将当前值与旧值进行比较， 如果相等则说明此值没有被修改过将当前值更新为新值，操作成功； 
 如果不相等则说明此值被其他进程修改过，直接返回失败，此时需要程序重新读取最新的值，再次调用CAS指令进行更新，重复此步骤直到成功为止， 或者设置一个重试次数，到了重试次数之后返回失败。
 
 ```C
@@ -50,9 +48,10 @@ struct attr_node
     unsigned int value;
 };
 
+
 void *shm_create(uint64_t shm_key, int ele_size, int ele_count)
 {
-    uint32_t size = ele_count*ele_count;
+    uint32_t size = ele_size * ele_count;
 
     /* 创建共享内存 */
     int shmid = shmget(shm_key, size, IPC_CREAT);
@@ -176,7 +175,7 @@ int main(int argc, char *argv[])
 [root@centos-7 workspace]# ./write.sh
 conflict count = 11992
 node->value = 120946
-[root@centos-7 workspace]# conflict count = 22405
+conflict count = 22405
 node->value = 249251
 conflict count = 18057
 node->value = 318179
