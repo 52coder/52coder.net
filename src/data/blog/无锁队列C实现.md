@@ -158,8 +158,7 @@ int main(int argc, char *argv[])
 }
 ```
 
-原作者代码上面代码中调用函数shm_creat时第三个参数传的是10，其实是没有必要的，因为我们接下来可以使用脚本演示对序号0处的内存进行同时读写。
-
+原作者代码上面代码中调用函数shm_creat时第三个参数传的是10，其实是没有必要的，传入10的话，id可以合法的取值0~9，由于我们演示可以只对id 0进行读写，同时上面的代码也需要判断id是否合法。
 ```
 #! /bin/bash
 
@@ -172,14 +171,19 @@ int main(int argc, char *argv[])
 程序执行的结果，每次的输出都不一样，但是最终值都是400000：
 
 ```
-[root@centos-7 workspace]# ./write.sh
-conflict count = 11992
-node->value = 120946
-conflict count = 22405
-node->value = 249251
-conflict count = 18057
-node->value = 318179
-conflict count = 58404
+gcc -o lockfree lockfree.c
+root@52coder:~/workspace/cpp# ./lockfree clear 0
+id = 0
+node->value = 0
+
+root@52coder:~/workspace/cpp# sh lockfree.sh 
+root@52coder:~/workspace/cpp# conflict count = 178691
+node->value = 351941
+conflict count = 189210
+node->value = 389400
+conflict count = 169375
+node->value = 398911
+conflict count = 187259
 node->value = 400000
 ```
 
