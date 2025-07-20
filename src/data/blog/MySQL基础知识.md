@@ -13,9 +13,6 @@ description: MySQL基础知识
 
 ![Forrest Gump Fake Quote](@/assets/images/forrest-gump-quote.png)
 
-## Table of contents
-
-
 ##安装后修改密码
 [安装mysql后修改密码](https://stackoverflow.com/questions/33510184/how-to-change-the-mysql-root-account-password-on-centos7?spm=a2c6h.12873639.0.0.2e533bb8E6K9By)
 ####MySQL连接
