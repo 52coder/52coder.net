@@ -13,9 +13,12 @@ description: vector动态扩容存在的陷阱
 
 ![Forrest Gump Fake Quote](@/assets/images/forrest-gump-quote.png)
 
-引子
+## Table of contents
+
+## 问题背景
 我们知道，std::vector之所以可以动态扩容，同时还可以保持顺序存储，主要取决于其扩容复制的机制。当容量满时，会重新划分一片更大的内存区域，然后将所有的元素拷贝过去。
 但是我却发现了一个奇怪的现象，std::vector扩容时，对其中的元素竟然进行的是深复制。请看示例代码：
+
 ```
 #include <iostream>
 #include <vector>
@@ -204,6 +207,7 @@ Test move
 
 这次如我们所愿，调用了移动构造。
 
-####结论
+ ## 结论  
+
 STL中考虑到异常的情况，因此，像这种容器内部的复制行为，是要求不能够发生异常的，因此，只有当移动构造函数声明为noexcept的时候才会调用，否则将统一调用拷贝构造函数。
 然而，在移动构造函数中本来就不应该抛出异常，因此，在大多数情况下，移动构造函数都应该用noexcept来声明。
