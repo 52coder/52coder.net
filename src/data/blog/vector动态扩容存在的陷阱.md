@@ -8,7 +8,7 @@ draft: false
 ogImage: ../../assets/images/forrest-gump-quote.png
 tags:
   - C++
-description: vector动态扩容存在的陷阱
+description: 当我们向vector中添加元素时，如果现有的内存空间不足以容纳新元素，vector会进行扩容。扩容的过程涉及到在内存中重新分配更大的空间，将现有元素拷贝到新结构中。
 ---
 
 ![Forrest Gump Fake Quote](@/assets/images/forrest-gump-quote.png)
