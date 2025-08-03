@@ -17,11 +17,14 @@ description: LevelDB is a fast key-value storage library written at Google that 
 本文所阅读的leveldb代码版本ac69108,采用问题提问与解答的形式记录，部分源码阅读笔记来源于23年，25年博客迁移基于最新版代码更新。
 
 ## 问题1：宏LEVELDB_EXPORT的作用？
-代码来源：export.h 这行代码的作用是定义一个宏 LEVELDB_EXPORT，并将其设置为 attribute((visibility("default")))。这个宏主要用于在编译时控制符号的可见性，特别是在编译共享库（动态链接库）时。
+源代码：export.h 
+
+这行代码的作用是定义一个宏 LEVELDB_EXPORT，并将其设置为 attribute((visibility("default")))。这个宏主要用于在编译时控制符号的可见性，特别是在编译共享库（动态链接库）时。
 
 attribute((visibility("default")))：
 attribute 是 GCC 编译器提供的扩展语法，用于为声明或类型指定特殊属性。
 visibility("default") 是一个属性，用于控制符号的可见性。具体来说，它控制着编译器生成的符号在共享库中的可见性。
+
 符号可见性：
 默认可见性 default：当一个符号（如函数、类、变量等）被声明为 default 可见性时，它在共享库中是可见的，可以被其他模块或程序链接和使用。
 隐藏可见性 hidden：如果一个符号被声明为 hidden 可见性，它在共享库中是不可见的，不能被其他模块或程序链接和使用。
@@ -29,6 +32,7 @@ visibility("default") 是一个属性，用于控制符号的可见性。具体�
 
 编译共享库：当编译一个共享库时，通常希望库中的某些符号（如公共接口）对外可见，而其他内部符号对用户隐藏。通过使用 attribute((visibility("default")))，可以确保这些公共接口在共享库中是可见的。
 优化：隐藏不必要的符号可以减少共享库的大小，提高加载速度，并减少符号冲突的风险。
+```
 // example.h
 #ifndef EXAMPLE_H
 #define EXAMPLE_H
@@ -53,11 +57,17 @@ void privateFunction() {
     std::cout << "This is a private function." << std::std::endl;
 }
 
+```
+
+
 编译方法：
-
+```
 g++ -fPIC -shared -o libexample.so example.cc
+```
 
- nm -gC libexample.so 
+
+```
+nm -gC libexample.so 
 0000000000201050 B __bss_start
                  U __cxa_atexit@@GLIBC_2.2.5
                  w __cxa_finalize@@GLIBC_2.2.5
@@ -76,8 +86,13 @@ g++ -fPIC -shared -o libexample.so example.cc
                  U std::cout@@GLIBCXX_3.4
                  U std::basic_ostream<char, std::char_traits<char> >& std::endl<char, std::char_traits<char> >(std::basic_ostream<char, std::char_traits<char> >&)@@GLIBCXX_3.4
                  U std::basic_ostream<char, std::char_traits<char> >& std::operator<< <std::char_traits<char> >(std::basic_ostream<char, std::char_traits<char> >&, char const*)@@GLIBCXX_3.4
+
+```
+
 ## 问题2：构造函数中C++11特性 default作用?
-源代码：include/leveldb/slice.h 在这段代码中，Slice类的拷贝构造函数和赋值操作符（operator=）都被声明为default。这是 C++11 引入的一个特性，用于显式地要求编译器生成默认的拷贝构造函数和赋值操作符。具体来说：
+源代码：include/leveldb/slice.h 
+
+在这段代码中，Slice类的拷贝构造函数和赋值操作符（operator=）都被声明为default。这是 C++11 引入的一个特性，用于显式地要求编译器生成默认的拷贝构造函数和赋值操作符。具体来说：
 
 拷贝构造函数 (Slice(const Slice&) = default;):
 当你使用 default 关键字时，编译器会生成一个默认的拷贝构造函数。这个默认的拷贝构造函数会逐成员地进行浅拷贝（即每个成员变量都会被简单地复制）。
@@ -96,15 +111,16 @@ g++ -fPIC -shared -o libexample.so example.cc
 示例代码
 
 假设你有以下代码：
-
+```
 Slicea("hello",5);
 // 调用拷贝构造函数
 Slice b = a;
 Slice c;
 // 调用赋值操作符
 c = a;
-在上述代码中：
+```
 
+在上述代码中：
 b 通过拷贝构造函数从 a 复制而来。
 c 通过赋值操作符从 a 复制而来。
 由于Slice类的拷贝构造函数和赋值操作符都被声明为default，编译器会生成默认的实现，这些实现会简单地复制data_和size_ 成员变量。
@@ -112,6 +128,7 @@ c 通过赋值操作符从 a 复制而来。
 ## 问题3：FALLTHROUGH_INTENDED用法
 源代码：util/hash.cc
 
+```
 // The FALLTHROUGH_INTENDED macro can be used to annotate implicit fall-through
 // between switch labels. The real definition should be provided externally.
 // This one is a fallback version for unsupported compilers.
@@ -153,15 +170,21 @@ int main() {
   processNumber(4);
   return 0;
 }
-运行结果：
 
+```
+
+运行结果：
+```
 Number is 1
 Number is 2
 Number is 3
 Number is 3
 Number is not 1, 2, or 3
+
+```
 如果支持c++17:
 
+```
 #include <iostream>
 #include <string>
 
@@ -188,13 +211,16 @@ int main() {
   processNumber(4);
   return 0;
 }
-运行结果：
 
+```
+运行结果：
+```
 Number is 1
 Number is 2
 Number is 3
 Number is 3
 Number is not 1, 2, or 3
+```
 ## 问题4：hash.cc中m为什么是0xc6a4a793 ？
 源代码：util/hash.cc
 
@@ -206,21 +232,26 @@ MurmurHash 是一种高效的哈希函数，广泛用于各种场景。0xc6a4a79
 ## 问题5：为什么C/C++宏中要用do {……}while(0)
 https://stackoverflow.com/questions/257418/do-while-0-what-is-it-good-for
 
+```
 #define FOO(x) foo(x); bar(x)
 
 if (condition)
     FOO(x);
 else // syntax error here
     ...;
+```
+
 假设宏FOO(x) 定义是foo(x); bar(x)，这里如果是放在if语句中(if语句未加{})会存在问题，编译失败。
 
 如果宏修改为：
-
+```
 #define FOO(x) { foo(x); bar(x); }
+```
+
 会同样报错，因为如果开发者在FOO(x)后添加了;号会报错。
 
 正确的解决方法：
-
+```
 #define FOO(x) do { foo(x); bar(x); } while (0)
 
 if (condition)
@@ -228,15 +259,20 @@ if (condition)
 else
     ....
 
+```
+
 替换后的代码正确：
+```
 if (condition)
    do { foo(x); bar(x); } while (0);
 else
     ....
+
+```
 ## 问题6：这里GUARDED_BY的作用？
 源代码：util/cache.cc
-
-  void LRU_Remove(LRUHandle* e);
+```
+void LRU_Remove(LRUHandle* e);
   void LRU_Append(LRUHandle* list, LRUHandle* e);
   void Ref(LRUHandle* e);
   void Unref(LRUHandle* e);
@@ -259,6 +295,9 @@ else
   LRUHandle in_use_ GUARDED_BY(mutex_);
 
   HandleTable table_ GUARDED_BY(mutex_);
+
+```
+  
 GUARDED_BY(mu) 变量必须被 mu 保护（通常用于成员变量）
 
 类似的还有：
@@ -270,7 +309,7 @@ EXCLUSIVE_LOCKS_REQUIRED(mu) 函数调用时必须持有 mu（排他锁）
 这里的 GUARDED_BY 是 Clang 编译器提供的线程安全静态分析注解（Thread Safety Analysis），用于在编译时检查多线程代码中的锁使用是否正确。它的作用是标记一个变量必须被指定的互斥锁保护，如果代码中访问该变量时未持有正确的锁，编译器会发出警告。
 
 示例：
-
+```
 #include "thread_annotations.h"
 
 class ThreadSafeCounter {
@@ -290,6 +329,9 @@ class ThreadSafeCounter {
     return count_;  // 错误：未加锁访问GUARDED_BY变量（Clang会报警告）
   }
 };
+
+```
+
 ## 问题7：为什么要取高4位值作为分片位置？
 源代码：util/cache.cc
 
@@ -306,8 +348,10 @@ class ThreadSafeCounter {
 这样做可以保证每个分片都能分到足够的容量，不会因为整除导致总容量变小。
 
 ## 问题9：LRUCache::Insert函数详解
-源代码：util/cache.cc 这里主要讲解下FinishErase函数，这里有一些难理解。
+源代码：util/cache.cc 
 
+这里主要讲解下FinishErase函数，这里有一些难理解。
+```
 Cache::Handle* LRUCache::Insert(const Slice& key, uint32_t hash, void* value,
                                 size_t charge,
                                 void (*deleter)(const Slice& key,
@@ -346,6 +390,9 @@ Cache::Handle* LRUCache::Insert(const Slice& key, uint32_t hash, void* value,
 
   return reinterpret_cast<Cache::Handle*>(e);
 }
+
+```
+
 table.Insert(e)会把新元素插入哈希表，如果有相同key的旧元素，会返回旧元素，调用FinishErase执行清理（减少引用计数，释放内存，更新usage_等）。
 
 如果插入元素之后使用量usage_ > capacity_则需要不断淘汰最久未使用的元素（即 lru_.next指向的元素),调用table_.Remove()从hash表中移除该元素，并返回指针，同样需要调用FinishErase()函数执行清理。
@@ -355,17 +402,21 @@ table.Insert(e)会把新元素插入哈希表，如果有相同key的旧元素�
 
 KeyMayMatch负责判断key是否在filter中。函数名中需要特别注意这个May，即这里Match判断可能会出错，也允许会出错。对于布隆过滤器，如果Key在filter里，那么一定会Match上；反之如果不在，可能返回true或false,结合注释可以验证。
 
+```
   // "filter" contains the data appended by a preceding call to
   // CreateFilter() on this class.  This method must return true if
   // the key was in the list of keys passed to CreateFilter().
   // This method may return true or false if the key was not on the
   // list, but it should aim to return false with a high probability.
   virtual bool KeyMayMatch(const Slice& key, const Slice& filter) const = 0;
+
+```
+  
 ## 问题11：策略模式
 filter_policy.h中的设计是一个典型的策略模式，filter_policy.h中对外提供NewBloomFilterPolicy接口，一个简单的可运行demo:
 
 维基百科
-
+```
 #include <iostream>
 
 using namespace std;
@@ -446,13 +497,19 @@ int main(int argc, char *argv[])
     return 0;
 }
 
+```
+
+
 运行结果：
+```
 Called ConcreteStrategyA execute method
 Called ConcreteStrategyB execute method
 Called ConcreteStrategyC execute method
 Called ConcreteStrategyB execute method
 Called ConcreteStrategyC execute method
+```
 
+```
 #include <iostream>
 #include <string>
 #include <vector>
@@ -523,9 +580,12 @@ int main() {
     db.Test();
     return 0;
 }
-运行结果：
+```
 
+运行结果：
+```
 Policy: BloomFilter
 Filter: bloom:a|b|c|
 Key 'b' may match? 1
 Key 'x' may match? 0
+```
