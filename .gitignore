@@ -29,3 +29,7 @@ pnpm-debug.log*
 # pagefind
 
 public/pagefind
+# vercel cli link
+.vercel/
+.vercel
+.env*
