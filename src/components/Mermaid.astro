@@ -1,0 +1,109 @@
+---
+// Renders ```mermaid fenced code blocks (highlighted by Shiki as
+// <pre data-language="mermaid">) into SVG diagrams on the client.
+// Runs after Shiki has already syntax-highlighted the block, so it
+// works purely off `.textContent`, which survives span-wrapping.
+---
+
+<script>
+  type Mermaid = Awaited<typeof import("mermaid")>["default"];
+  type MermaidTheme = "dark" | "default";
+
+  // mermaid is a large bundle, so it's imported lazily the first time a
+  // page actually contains a diagram (most posts have none).
+  let mermaidPromise: Promise<Mermaid> | null = null;
+  let currentTheme: MermaidTheme | null = null;
+
+  function getPreferredTheme(): MermaidTheme {
+    return document.documentElement.getAttribute("data-theme") === "dark"
+      ? "dark"
+      : "default";
+  }
+
+  async function getMermaid(theme: MermaidTheme) {
+    mermaidPromise ??= import("mermaid").then(m => m.default);
+    const mermaid = await mermaidPromise;
+    if (currentTheme !== theme) {
+      mermaid.initialize({
+        startOnLoad: false,
+        theme,
+        securityLevel: "loose",
+        fontFamily: "inherit",
+        themeVariables: {
+          fontSize: "14px",
+        },
+      });
+      currentTheme = theme;
+    }
+    return mermaid;
+  }
+
+  async function renderInto(
+    mermaid: Mermaid,
+    container: HTMLElement,
+    source: string
+  ) {
+    try {
+      const id = `mermaid-${Math.random().toString(36).slice(2, 10)}`;
+      const { svg } = await mermaid.render(id, source);
+      container.innerHTML = svg;
+      const svgEl = container.querySelector("svg");
+      if (svgEl) {
+        svgEl.removeAttribute("height");
+        svgEl.style.maxWidth = "100%";
+      }
+    } catch {
+      container.innerHTML =
+        '<p class="text-sm text-red-500">⚠️ Mermaid 图表渲染失败，请检查语法。</p>';
+    }
+  }
+
+  // Turn any not-yet-converted ```mermaid code blocks into placeholder
+  // containers that remember their source (so we can re-render them
+  // later, e.g. on a light/dark theme switch, without the original
+  // <pre> still being in the DOM).
+  function convertPendingBlocks() {
+    const pres = document.querySelectorAll<HTMLElement>(
+      'pre[data-language="mermaid"]'
+    );
+    pres.forEach(pre => {
+      // Read from the inner <code>, not the <pre>: PostDetails.astro's
+      // copy-button script appends a "Copy" <button> into the <pre>
+      // before this runs, so pre.textContent would include that label.
+      const source = (pre.querySelector("code")?.textContent ?? "").trim();
+      if (!source) return;
+
+      const container = document.createElement("div");
+      container.className =
+        "mermaid-diagram not-prose my-6 flex justify-center overflow-x-auto";
+      container.dataset.mermaidSource = source;
+      pre.replaceWith(container);
+    });
+  }
+
+  async function renderAllDiagrams() {
+    convertPendingBlocks();
+
+    const containers = document.querySelectorAll<HTMLElement>(
+      ".mermaid-diagram[data-mermaid-source]"
+    );
+    if (containers.length === 0) return;
+
+    const mermaid = await getMermaid(getPreferredTheme());
+    for (const container of containers) {
+      const source = container.dataset.mermaidSource;
+      if (source) {
+        await renderInto(mermaid, container, source);
+      }
+    }
+  }
+
+  // Initial load + every client-side (View Transitions) navigation.
+  document.addEventListener("astro:page-load", renderAllDiagrams);
+
+  // Re-render with the new palette whenever the site theme changes.
+  // toggle-theme.js dispatches this from setPreference() after it has
+  // already flipped data-theme, so getPreferredTheme() reads the new
+  // value; it covers both the toggle button and OS scheme changes.
+  document.addEventListener("theme-change", renderAllDiagrams);
+</script>

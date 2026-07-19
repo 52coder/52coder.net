@@ -21,6 +21,10 @@ let themeValue = getPreferTheme();
 function setPreference() {
   localStorage.setItem("theme", themeValue);
   reflectPreference();
+  // Broadcast a single theme-change signal (fires for both the toggle
+  // button and OS prefers-color-scheme changes) so theme-reactive
+  // components don't have to sniff #theme-btn clicks themselves.
+  document.dispatchEvent(new CustomEvent("theme-change", { detail: themeValue }));
 }
 
 function reflectPreference() {

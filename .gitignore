@@ -23,6 +23,9 @@ pnpm-debug.log*
 # jetbrains setting folder
 .idea/
 
+# obsidian editor config
+.obsidian/
+
 # pagefind
 
 public/pagefind

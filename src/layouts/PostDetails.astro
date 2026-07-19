@@ -10,6 +10,7 @@ import EditPost from "@/components/EditPost.astro";
 import ShareLinks from "@/components/ShareLinks.astro";
 import BackButton from "@/components/BackButton.astro";
 import BackToTopButton from "@/components/BackToTopButton.astro";
+import Mermaid from "@/components/Mermaid.astro";
 import { getPath } from "@/utils/getPath";
 import { slugifyStr } from "@/utils/slugify";
 import IconChevronLeft from "@/assets/icons/IconChevronLeft.svg";
@@ -111,7 +112,9 @@ const nextPost =
     >
       <Content />
     </article>
-    
+
+    <Mermaid />
+
     <PostComments />
 
     <hr class="my-8 border-dashed" />
