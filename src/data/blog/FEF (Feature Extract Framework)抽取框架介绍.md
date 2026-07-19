@@ -4,7 +4,7 @@ author: 52coder
 pubDatetime: 2025-07-18T10:00:00.000Z
 slug: fef-feature-extract-framework-intro
 featured: false
-draft: false
+draft: true
 ogImage: ../../assets/images/forrest-gump-quote.png
 tags:
   - cpp
