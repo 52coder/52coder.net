@@ -34,6 +34,28 @@ Docker alternative: `docker compose up -d` for dev, or `docker build -t astropap
 - **Post images go in `src/assets/images/posts/<post-slug>/`** — one directory per post, named exactly after that post's frontmatter `slug`. The `src/assets/images/` root is reserved for site-wide/shared assets (e.g. `forrest-gump-quote.png`, the common fallback `ogImage`). Keeping the directory name equal to the slug makes image→post ownership mechanically derivable: orphaned image directories can be found by diffing directory names against post slugs, rather than relying on memory. Reference images as `@/assets/images/posts/<slug>/foo.png` in body Markdown, but note the `ogImage` frontmatter field needs a *relative* path (`../../assets/images/posts/<slug>/foo.png`) — a repo-wide search for the old path after moving images must cover both forms. Astro's image pipeline rewrites these to responsive WebP with `srcset` at build time, so built HTML references `.webp` under `/_astro/`, not the original `.png`.
 - `src/utils/getSortedPosts.ts`, `getPostsByTag.ts`, `getUniqueTags.ts`, `getPostsByGroupCondition.ts` implement listing/tag/archive views on top of the filtered collection.
 
+#### Writing Chinese Markdown: `**bold**` breaks next to full-width punctuation
+
+Posts are mostly Chinese, and CommonMark's emphasis [flanking rules](https://spec.commonmark.org/0.31.2/#left-flanking-delimiter-run) interact badly with CJK punctuation. A `**` marker only works when it is adjacent to a *letter*; put it next to punctuation such as `（）「」“”，。` and the emphasis silently fails to parse, rendering the literal asterisks on the page. The build does **not** warn — `astro check` passes and the page ships with visible `**`.
+
+Both ends can fail independently:
+
+```markdown
+答案藏在**盘口（Order Book）**里：      <!-- BROKEN: closing ** preceded by `）`, followed by a letter -->
+答案藏在**盘口**（Order Book）里：      <!-- OK: closing ** now preceded by `口` -->
+
+这个**“不作为的绝大多数时间”，…原因**   <!-- BROKEN: opening ** followed by `“`, preceded by a letter -->
+**这个“不作为的绝大多数时间”，…原因**   <!-- OK: opening ** now followed by `这` -->
+```
+
+Rule of thumb when authoring: **keep at least one side of each `**` touching a Han character or letter — never let it sit between two punctuation marks.** The usual fixes are to move a parenthetical outside the emphasis, or to pull the preceding word inside it.
+
+To find every occurrence across the site, don't reason about the rule — grep the *built* output for surviving literal asterisks (code blocks legitimately contain `***`, so filter those out):
+
+```bash
+grep -o '[^<>]\{0,20\}\*\*[^<>*]\{1,40\}\*\*' dist/posts/*/index.html | grep -v '\*\*\*\*'
+```
+
 ### Rendering & layouts
 - `src/layouts/Layout.astro` is the base HTML shell (head, meta/OG tags, theme script); `src/layouts/Main.astro` wraps page content; `src/layouts/PostDetails.astro` renders a single post (title, datetime, edit-on-GitHub link, rendered `<Content />`, comments, tags, share links, prev/next navigation) and injects client-side `<script>` behavior for the scroll progress bar, heading anchor links, and code-block copy buttons.
 - `src/pages/` maps directly to routes: `posts/[...page].astro` (paginated post list), `posts/[...slug]/index.astro` (single post) and its sibling `index.png.ts` (per-post OG image), `tags/[tag]/[...page].astro`, `archives/index.astro`, `search.astro` (Pagefind UI), plus `rss.xml.ts`, `robots.txt.ts`, and top-level `og.png.ts` (default OG image).
