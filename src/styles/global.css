@@ -20,6 +20,24 @@ html[data-theme="dark"] {
   --border: #ab4b08;
 }
 
+@theme {
+  /* Cross-platform monospace stack.
+   *
+   * Latin glyphs resolve to the first available mono face: SF Mono on macOS,
+   * Cascadia Code / Consolas on Windows. None of those fonts ship CJK glyphs,
+   * so the browser keeps walking the list per-character for Chinese text —
+   * which is why the CJK faces are listed *after* the mono ones. Declaring
+   * them explicitly is the point: without it Windows falls back to SimSun
+   * (宋体), whose thin strokes and small glyph size clash badly with Consolas,
+   * while macOS silently picks the much nicer PingFang SC.
+   */
+  --font-mono:
+    ui-monospace, SFMono-Regular, "SF Mono", Menlo, Monaco, "Cascadia Code",
+    "Cascadia Mono", Consolas, "Liberation Mono", "Courier New",
+    "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "微软雅黑",
+    "Noto Sans CJK SC", "Source Han Sans SC", monospace;
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -55,7 +73,7 @@ html[data-theme="dark"] {
 }
 
 @utility max-w-app {
-  @apply max-w-3xl;
+  @apply max-w-4xl;
 }
 
 .active-nav {
