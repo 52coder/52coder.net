@@ -4,7 +4,7 @@ author: 52coder
 pubDatetime: 2026-05-05T10:00:00.000Z
 slug: rank-framework-build-journey
 featured: false
-draft: false
+draft: true
 ogImage: ../../assets/images/forrest-gump-quote.png
 tags:
   - cpp

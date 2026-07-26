@@ -2,6 +2,7 @@
 title: Ghostty + Yazi 现代终端配置指南
 author: 52coder
 pubDatetime: 2026-04-24T10:00:00.000Z
+modDatetime: 2026-07-25T10:00:00.000Z
 slug: ghostty-yazi-terminal-setup
 featured: false
 draft: false
@@ -82,6 +83,7 @@ quick-terminal-position = top
 quick-terminal-screen = mouse
 quick-terminal-autohide = true
 quick-terminal-animation-duration = 0.15
+keybind = global:ctrl+grave_accent=toggle_quick_terminal
 
 # 性能
 scrollback-limit = 25000000
@@ -89,42 +91,87 @@ scrollback-limit = 25000000
 
 ## Ghostty 快捷键
 
-### 标签页
+> 以下基于 Ghostty **1.3.1** 的默认键位（用 `ghostty +list-keybinds --default` 可自查），`Cmd` 对应配置里的 `super`。
+
+### 标签页 & 窗口
 
 | 快捷键 | 功能 |
 |--------|------|
 | `Cmd + T` | 新建标签页 |
-| `Cmd + Shift + ←` | 切换到上一个标签页 |
-| `Cmd + Shift + →` | 切换到下一个标签页 |
-| `Cmd + W` | 关闭当前面板/标签页 |
+| `Cmd + N` | 新建窗口 |
+| `Cmd + W` | 关闭当前分屏 / 面板 |
+| `Cmd + Option + W` | 关闭当前标签页 |
+| `Cmd + Shift + W` | 关闭当前窗口 |
+| `Cmd + Shift + T` | 撤销关闭（重开刚关掉的标签页 / 分屏） |
+| `Cmd + 1`~`8` | 跳到第 1~8 个标签页 |
+| `Cmd + 9` | 跳到**最后一个**标签页（不是第 9 个） |
+| `Cmd + Shift + [` / `]` | 上一个 / 下一个标签页 |
+| `Cmd + Enter` | 切换全屏 |
+
+macOS 上标签页是系统原生标签栏，外观与行为跟 Safari、Finder 一致，支持拖拽重排。
 
 ### 分屏
 
 | 快捷键 | 功能 |
 |--------|------|
-| `Cmd + D` | 向右垂直分屏 |
-| `Cmd + Shift + D` | 向下水平分屏 |
-| `Cmd + Option + ←` | 切换到左侧分屏 |
-| `Cmd + Option + →` | 切换到右侧分屏 |
-| `Cmd + Option + ↑` | 切换到上方分屏 |
-| `Cmd + Option + ↓` | 切换到下方分屏 |
-| `Cmd + Shift + E` | 均等化所有分屏大小 |
-| `Cmd + Shift + F` | 当前分屏全屏/还原 |
+| `Cmd + D` | 向右分屏 |
+| `Cmd + Shift + D` | 向下分屏 |
+| `Cmd + [` / `]` | 上一个 / 下一个分屏（循环切焦点） |
+| `Cmd + Option + ←→↑↓` | 按方向切换分屏焦点 |
+| `Cmd + Ctrl + ←→↑↓` | 调整分屏大小 |
+| `Cmd + Ctrl + =` | 均等化所有分屏 |
+| `Cmd + Shift + Enter` | 分屏缩放（最大化 / 还原，相当于 tmux 的 prefix + z） |
 
-### 字体与其他
+⚠️ **切标签页和切分屏的区别，关键在 Shift**：`Cmd + Shift + [` `]` 切**标签页**，去掉 Shift 的 `Cmd + [` `]` 切**分屏焦点**——两者都在 `[` `]` 键上，靠 Shift 区分（不是花括号与方括号之分）。
+
+### 搜索 & 滚动历史
 
 | 快捷键 | 功能 |
 |--------|------|
-| `Cmd + +` | 增大字体 |
-| `Cmd + -` | 缩小字体 |
-| `Cmd + 0` | 重置字体大小 |
-| `Cmd + Shift + ,` | 重新加载配置（无需重启） |
+| `Cmd + F` | 在 scrollback 里搜索（1.3 新增原生搜索） |
+| `Cmd + G` / `Cmd + Shift + G` | 跳到下一个 / 上一个匹配 |
+| `Cmd + E` | 以当前选中内容为关键词搜索 |
+| `Esc` / `Cmd + Shift + F` | 退出搜索 |
+| `Cmd + ↑` / `↓` | 跳到上一个 / 下一个命令提示符（需 shell 集成） |
+| `Cmd + Home` / `End` | 滚到顶部 / 底部 |
+| `Cmd + PageUp` / `PageDown` | 上翻 / 下翻一页 |
+
+### 剪贴板 & 字体
+
+| 快捷键 | 功能 |
+|--------|------|
+| `Cmd + C` / `Cmd + V` | 复制 / 粘贴 |
+| `Cmd + Shift + V` | 粘贴上次选中的内容（selection） |
+| `Cmd + A` | 全选 |
+| `Cmd + K` | 清屏 |
+| `Cmd + +` / `Cmd + -` / `Cmd + 0` | 增大 / 缩小 / 重置字体 |
+
+### 配置 & CLI
+
+| 快捷键 | 功能 |
+|--------|------|
+| `Cmd + ,` | 打开配置文件 |
+| `Cmd + Shift + ,` | 重载配置（改完即时生效，无需重启） |
+| `Cmd + Shift + P` | 命令面板（搜索所有动作并顺带看其快捷键） |
+| `Cmd + Option + I` | 终端 Inspector（调试渲染 / 按键） |
+
+### 1.3 版本的几个更新
+
+- **原生 scrollback 搜索**：以前只能靠 tmux 或「导出文本再搜」绕，现在 `Cmd + F` 直接搜回滚缓冲，上面那张搜索表就是它的完整键位。
+- **原生滚动条**与**可点击的 shell 提示符光标**：配合 shell 集成，可直接用鼠标点提示符定位。
+- 觉得默认分屏键不够直观，可以用方向符号重绑：
+
+```toml
+keybind = cmd+shift+|=new_split:right
+keybind = cmd+shift+-=new_split:down
+```
 
 ## Quake 下拉终端
 
 这是 Ghostty 最实用的功能之一。按下全局快捷键 `Ctrl + `` ` ``（反引号，数字 1 左边的键），无论当前在哪个应用，都会从屏幕顶部滑出一个终端窗口；再按一次收起。
 
-- Mac 上：`Ctrl` 即键盘左下角的 `control` 键
+- **默认不绑定快捷键**：Ghostty 没给 Quick Terminal 预设键，需在 config 里加 `keybind = global:ctrl+grave_accent=toggle_quick_terminal`（上面的配置已包含）
+- `global:` 全局快捷键要到「系统设置 → 隐私与安全性 → 辅助功能」给 Ghostty 授权后才生效
 - 失去焦点自动隐藏（`quick-terminal-autohide = true`）
 - 跟随鼠标所在屏幕（`quick-terminal-screen = mouse`）
 
