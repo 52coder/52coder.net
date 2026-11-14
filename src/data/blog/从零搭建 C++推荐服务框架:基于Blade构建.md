@@ -2,6 +2,7 @@
 title: 从零搭建 C++推荐服务框架：基于Blade构建
 author: 52coder
 pubDatetime: 2026-05-05T10:00:00.000Z
+modDatetime: 2026-11-08T00:00:00+08:00
 slug: rank-framework-build-journey
 featured: false
 draft: true
@@ -23,11 +24,11 @@ description: 记录在 Mac + Ubuntu 22.04 容器内从零编译运行一个基�
 
 这是一套基于 **brpc + DAG 图执行**的 C++ 排序/推荐服务框架，结构上分三层：
 
-| 目录 | 角色 |
-|---|---|
-| `rank/` | 框架层：vvframe DAG 引擎、各种 Manager（Graph/Cache/Transport/DynamicConf）、`Impl` RPC 基类 |
-| `rank_services/` | 业务层：业务 `Node` 子类、业务 proto、`main/main.cpp` 入口 |
-| `rank/thirdparty/` | 三方依赖：brpc、protobuf、gflags、glog、boost、tinyxml2 等，全部 vendored |
+| 目录               | 角色                                                                                         |
+| ------------------ | -------------------------------------------------------------------------------------------- |
+| `rank/`            | 框架层：vvframe DAG 引擎、各种 Manager（Graph/Cache/Transport/DynamicConf）、`Impl` RPC 基类 |
+| `rank_services/`   | 业务层：业务 `Node` 子类、业务 proto、`main/main.cpp` 入口                                   |
+| `rank/thirdparty/` | 三方依赖：brpc、protobuf、gflags、glog、boost、tinyxml2 等，全部 vendored                    |
 
 构建系统用的是**Blade**。请求处理流程大致是：
 
@@ -41,11 +42,11 @@ client request
 
 DAG 拓扑由 `conf/graph.xml` 描述，节点名→类的映射由 `conf/node.xml` 决定，运行期 `DynamicConfLoadMgr` 每 2 秒轮询配置文件做热更新。
 
-## 构建环境约束：必须 Linux x86_64
+## 先匹配预编译依赖的运行平台
 
-`thirdparty/` 下所有 `.a` / `.so` 都是 x86_64 Linux ELF 二进制（brpc、jemalloc、leveldb**没有 Mac 版本可替换**。
+本文使用的 `thirdparty/` 快照带有 Linux x86_64 预编译产物，它们不能直接链接进 macOS 程序。这是这份依赖包的约束，不是说 brpc、jemalloc 或 LevelDB 一概不支持 macOS。可以用 `file` 和 `readelf` 检查具体文件。
 
-所以 Mac 上虽然能正常 IDE 阅读、编辑，但**编译/链接/运行必须在 Linux 环境**。三种典型方案：
+沿用这些二进制时，需要匹配 Linux x86_64 环境；如果宿主是 Apple 芯片，还应确认容器的平台和仿真设置。可选的环境有：
 
 - Docker / OrbStack 起 Ubuntu 容器
 - SSH 到远程 Linux 主机（VS Code Remote-SSH 体验不错）
@@ -103,7 +104,7 @@ oid sha256:abc...
 size 12345
 ```
 
-链接器把这段文本当作 linker script 解析就炸了。
+链接器收到的是文本指针，无法按静态库格式解析。
 
 **修复**：
 
@@ -115,11 +116,11 @@ file rank/thirdparty/tinyxml2/lib64/libtinyxml2.a
 # 应输出: current ar archive
 ```
 
-正确顺序永远是：**先 `git lfs install` 再 `git clone`**。
+新机器可以先安装并初始化 Git LFS，再克隆项目。已经克隆的仓库也能通过 `git lfs pull` 补齐对象，不需要因此重拉全部代码。
 
-## 五大编译错误根因
+## 三类编译错误
 
-切到 Ubuntu 22.04 后，`blade build //rank:framework` 报了 50+ 条编译错误，但根因只有 5 类。
+切到 Ubuntu 22.04 后，`blade build //rank:framework` 出现了多条编译错误。下面按三个原因整理，避免逐条修改连锁报错。
 
 ### #1 protobuf 版本不匹配（最关键）
 
@@ -142,9 +143,9 @@ grep "PROTOBUF_VERSION" thirdparty/brpc/include/brpc/options.pb.h
 # #if PROTOBUF_VERSION < 3021000                 ← 3.21.x
 ```
 
-**vendored 的 protobuf 是 3.7.1，但 brpc 头文件由 3.21.1 的 protoc 生成** —— 80% 以上的错误都是这一条 cascade 出来的。
+现有 protobuf 头文件标记为 3.7.1，而所用 brpc 生成头要求 3.21.x 级别的接口，因此产生了一批连锁报错。
 
-修复 —— 容器内重编 protobuf 3.21.12 覆盖：
+修复，容器内重编 protobuf 3.21.12 覆盖：
 
 ```bash
 cd /tmp
@@ -156,17 +157,17 @@ tar xf pb.tar.gz && cd protobuf-3.21.12
 make -j$(nproc)
 
 # 备份旧版本
-mv /workspace/rank/thirdparty/protobuf/include       .../include.bak3.7
-mv /workspace/rank/thirdparty/protobuf/lib64_release .../lib64_release.bak3.7
-mv /workspace/rank/thirdparty/protobuf/bin/protoc    .../bin/protoc.bak3.7
+mv /workspace/rank/thirdparty/protobuf/include /workspace/rank/thirdparty/protobuf/include.bak3.7
+mv /workspace/rank/thirdparty/protobuf/lib64_release /workspace/rank/thirdparty/protobuf/lib64_release.bak3.7
+mv /workspace/rank/thirdparty/protobuf/bin/protoc    /workspace/rank/thirdparty/protobuf/bin/protoc.bak3.7
 
 make install
 mv /workspace/rank/thirdparty/protobuf/lib /workspace/rank/thirdparty/protobuf/lib64_release
 ```
 
-`-D_GLIBCXX_USE_CXX11_ABI=0` 必须加 —— 要和其他 vendored `.a` 的 ABI 保持一致（`BLADE_ROOT` 里全局设置的是 `=1`，但我们这套 vendored 库实际编译时是 `=0`，混用会出现 `std::string` 链接失败）。
+`-D_GLIBCXX_USE_CXX11_ABI=0` 是这次为匹配现有 `.a` 使用的设置，并不是通用的 protobuf 编译要求。是否需要它，应核对其他 vendored 库的 ABI（`BLADE_ROOT` 里全局设置的是 `=1`，但我们这套 vendored 库实际编译时是 `=0`，混用会出现 `std::string` 链接失败）。
 
-### #2 glog 0.6+ 强制 C++14
+### #2 依赖使用了 C++14 特性
 
 ```
 'exchange' is not a member of 'std'
@@ -176,10 +177,9 @@ mv /workspace/rank/thirdparty/protobuf/lib /workspace/rank/thirdparty/protobuf/l
 `std::exchange` 是 C++14、`std::make_unique` 也是 C++14。`BLADE_ROOT` 里默认是 `-std=c++11`：
 
 ```python
+# 只展示语言标准选项，其余配置保留。
 cxxflags = [
-    ...
-    '-std=c++11',     # 改成 -std=c++14
-    ...
+    '-std=c++14',
 ]
 ```
 
@@ -200,7 +200,6 @@ bthread_start_background(&tid, &BTHREAD_ATTR_SMALL, b_func, args);
 
 brpc 里 `BTHREAD_ATTR_SMALL` 是 `static const bthread_attr_t` 值，但函数签名要的是指针。
 
-
 ## 运行期问题
 
 ### 问题 1：Server 起来了，curl 卡死
@@ -213,14 +212,14 @@ brpc 里 `BTHREAD_ATTR_SMALL` 是 `static const bthread_attr_t` 值，但函数�
 ps -T -p $(pgrep rank_server)   # 只有 2 个线程
 ```
 
-正常 brpc 服务有几十个 bthread worker。原因是 `impl.cpp` 里用了：
+线程数量取决于配置，不能以“是否有几十个线程”作为通用标准。本次排查需要关注的是，启动线程后 `impl.cpp` 又调用了：
 
 ```cpp
 m_server.Start(...);
 daemon(1, 1);                    // ← 这里炸
 ```
 
-`daemon()` 内部 `fork()` 了一次，但 **fork 后 brpc 的 bthread 都丢了**（bthread 是用户态调度，挂在原 pthread 上，fork 只复制调用线程）。
+`daemon()` 涉及 `fork()`。多线程进程 fork 后，子进程只保留调用线程，其他线程持有的运行状态和锁可能无法继续正常工作。问题发生在启动线程之后再派生子进程；不能简单概括成“任何时候 fork 都会使 brpc 失效”。参见 [Linux fork 文档](https://man7.org/linux/man-pages/man2/fork.2.html)。
 
 修复：删掉 `daemon()`，换成阻塞等待信号：
 
@@ -258,9 +257,9 @@ patchelf --set-rpath '$ORIGIN/../lib64_release' \
 boost/core/ref.hpp: No such file or directory
 ```
 
-但 GitHub 上文件明明在。原因：之前 `.gitignore` 里写了 `core`，**这是 basename 匹配，会匹配到任意层级里叫 `core` 的目录或文件**，于是 `boost/include/boost/core/` 这个软链被静默忽略了。
+先确认缺失文件是否真正提交过。`.gitignore` 不会让已跟踪的文件在 clone 时消失；它可能阻止未跟踪文件被加入版本控制。本次需要检查的规则是 `.gitignore` 里的 `core`，**这是 basename 匹配，会匹配到任意层级里叫 `core` 的目录或文件**，可能使新增的 `boost/include/boost/core/` 软链没有被提交。可用 `git ls-files` 和 `git check-ignore -v` 分别核对跟踪状态与匹配规则。
 
-修复 —— `.gitignore` 里写**锚定路径**：
+修复，`.gitignore` 里写**锚定路径**：
 
 ```
 # 错的（basename 匹配）
@@ -318,9 +317,9 @@ echo "OK: $ROOT/dist/$PKG.zip ($(du -sh "$PKG.zip" | cut -f1))"
 
 2. **`-L` 解软链**：`libssl.so.3` 通常是软链到 `libssl.so.3.0.x`，不解软链的话 zip 里只有空软链，部署解压后链接断掉。
 
-3. **RPATH 用 `$ORIGIN`**：包解到任意路径都能跑，不用配 `LD_LIBRARY_PATH`。
+3. **RPATH 用 `$ORIGIN`**：能减少对安装绝对路径的依赖，但目标机的架构、glibc 与动态库 ABI 仍需兼容。
 
-4. **conf 目录作为参数传入**：`bash build_package.sh conf/demo` —— 将来加 `conf/prod`、`conf/canary` 不用改脚本。
+4. **conf 目录作为参数传入**：`bash build_package.sh conf/demo`，将来加 `conf/prod`、`conf/canary` 不用改脚本。
 
 部署机：
 
@@ -332,7 +331,7 @@ cd rank_server-v1.0
 
 ## 框架内部的 3 个值得注意的设计点
 
-工程跑通之后回头看代码，DAG 调度部分有几处实现挺有意思 —— 既看得出当年的取舍，也能识别出潜在风险。
+工程跑通之后回头看代码，DAG 调度部分有几处实现挺有意思，既看得出当年的取舍，也能识别出潜在风险。
 
 ### Node::skip() — 双重否定的认知负担
 
@@ -355,7 +354,7 @@ bool Node::skip(std::shared_ptr<GraphContext> context) {
 
 设计上是想让子类按需重写 `skip()` 返回 `true` 来短路某些条件下的执行（比如灰度开关、缓存命中等）。但调用点是 `if (!skip())`，**双重否定**：
 
-> "如果不跳过就执行" ←→ 子类覆盖时要思考"我什么时候返回 true 让自己不执行"
+> “如果不跳过就执行” ←→ 子类覆盖时要思考“我什么时候返回 true 让自己不执行”
 
 这种 API 命名在维护期会反复让人卡壳。更直观的写法是把语义正向化，例如：
 
@@ -364,9 +363,9 @@ virtual bool should_run(...) { return true; }   // 默认执行；子类按需�
 // run() 内: if (should_run(ctx)) do_service(ctx);
 ```
 
-历史上这段代码还出过更严重的 bug —— 早期版本是 `if (skip())` 直接进入 `do_service` 分支，**与函数名完全相反**。这种 bug 在静态分析里不会报，单测如果只覆盖默认路径（`skip()=false`）也发现不了，只有重写 `skip()` 期望短路的子类才会触发。教训：**布尔值 API 的命名一定要正向化，"skip"、"disable"、"hide" 这种否定语义在调用点配合 `!` 极易出错**。
+旧代码曾出现 `if (skip())` 却进入执行分支的写法，与函数名相反。测试应分别覆盖 `skip()` 为真和为假，并断言业务是否执行。正向命名可以减少阅读负担，但不能替代分支验证；也不能认定所有带 `skip` 或 `disable` 的接口都需要改名。
 
-### CacheWrapper<T> — `volatile` 假装的"原子双缓冲"
+### CacheWrapper<T> — `volatile` 假装的“原子双缓冲”
 
 热更新场景常用双缓冲：写线程把新数据写到备用 buffer，再原子切换索引；读线程拿到的要么是新数据要么是旧数据，绝不会读到半更新状态。代码里这套实现长这样：
 
@@ -390,32 +389,34 @@ public:
 };
 ```
 
-看起来像是无锁双缓冲，**但实际上有两个并发缺陷**：
+这里需要分别检查索引同步和数据的存储期。`volatile` 不提供 C++ 线程间同步；读写同一非原子对象而没有适当同步，可能形成数据竞争，不能因为在 x86 上暂时没有崩溃就认定正确。
 
-1. **`volatile` 不等于原子**。C++ 里 `volatile` 只承诺"编译器不要把读写优化掉"，**不保证多线程可见性、不保证读写不可分割、也不提供任何内存序**。在 ARM、Power 这类弱一致内存模型上，读线程完全可能先看到 `++m_index` 的结果、再看到旧的 `m_data[tmp%2]`（写顺序被 reorder），结果取出半写完的数据。
+**只把索引改成 atomic 仍然不够。** 假设读线程拿到槽 0 后尚未读完，写线程连续更新两次，第二次又写回槽 0。即使索引使用 release/acquire，读写仍可能同时碰到同一个 `T`。多写线程之间也有竞争，单独给索引加 CAS 无法解决槽位的存储期问题。
 
-2. **写-写竞争**。多个写线程同时调 `updateData()`，两次 `m_index + 1` 算到同一个槽，互相覆盖；`++m_index` 也不是原子的（读-改-写三步），最后 `m_index` 可能比预期少 1。
-
-正确做法是用 `std::atomic<unsigned int>` 配合 release/acquire 语义：
+没有证据表明锁成为瓶颈时，可以先用互斥锁保护整个访问，并返回独立副本：
 
 ```cpp
-std::atomic<unsigned int> m_index{0};
+#include <mutex>
 
-T getData() const {
-    return m_data[m_index.load(std::memory_order_acquire) % 2];
-}
+template <class T>
+class CacheWrapper {
+    mutable std::mutex mutex_;
+    T data_{};
 
-void updateData(const T& data) {
-    unsigned cur = m_index.load(std::memory_order_relaxed);
-    m_data[(cur + 1) % 2] = data;
-    m_index.store(cur + 1, std::memory_order_release);   // release: 保证 m_data 写在前
-}
-// 多写场景再加一把锁，或者用 CAS
+public:
+    T getData() const {
+        std::lock_guard<std::mutex> lock(mutex_);
+        return data_;
+    }
+
+    void updateData(const T& data) {
+        std::lock_guard<std::mutex> lock(mutex_);
+        data_ = data;
+    }
+};
 ```
 
-`memory_order_release` / `acquire` 确保读线程在看到新 `m_index` 时一定能看到对应的 `m_data` 写入。这点 `volatile` 做不到。
-
-线上实测："偶发空指针 / map 访问越界" 这类不可复现的崩溃大概率就来自这种"看起来无锁、实际无序"的代码。
+这个示例假定 `T` 的复制能得到调用方可独立读取的数据。如果 `T` 内部仍共享可变指针，还需处理指向对象的同步。数据较大时，也可研究发布不可变快照并持有其所有权的方案；无论采用哪种方式，都要回答“旧读者何时读完”，不能只回答“新索引何时可见”。
 
 ### DynamicConfLoadMgr — mtime 轮询 + 2 秒延迟
 
@@ -447,14 +448,14 @@ bool ConfElement::refreshConfig() {
 
 设计要点：
 
-- **基于 `st_mtime` 的轮询**，不依赖 `inotify`/`fanotify` 这类内核事件 —— 跨平台、易理解，但延迟取决于轮询周期（这里 2 秒）
-- **"now > mtime + 2"** 是一个朴素的"写入完成"判定 —— 配置文件被 `vim`/`scp` 落地时通常是分多次 `write()`，立即 stat 拿到的可能是不完整文件。等 2 秒能粗略避开这种情况，但不是绝对安全（大文件 / 慢盘可能写超过 2 秒）
-- 注册的 `ConfElement` 子类（GraphConf / NodeConf / ServiceConf / LogLevelConf）各自实现 `parseConfig()` 调用对应 manager 的 `init()` —— **重新加载时是整体替换**，没做增量 diff；如果某个 manager 内部不是双缓冲实现，热更新瞬间会有短暂"配置撕裂"窗口
+- **基于 `st_mtime` 的轮询**，不依赖 `inotify`/`fanotify` 这类内核事件，跨平台、易理解，但延迟取决于轮询周期（这里 2 秒）
+- **“now > mtime + 2”** 是一个朴素的“写入完成”判定，配置文件被 `vim`/`scp` 落地时通常是分多次 `write()`，立即 stat 拿到的可能是不完整文件。等 2 秒能粗略避开这种情况，但不是绝对安全（大文件 / 慢盘可能写超过 2 秒）
+- 注册的 `ConfElement` 子类（GraphConf / NodeConf / ServiceConf / LogLevelConf）各自实现 `parseConfig()` 调用对应 manager 的 `init()`，**重新加载时是整体替换**，没做增量 diff；如果某个 manager 内部不是双缓冲实现，热更新瞬间会有短暂“配置撕裂”窗口
 
 更稳妥的实现方向：
 
-1. 用 `inotify_add_watch(IN_CLOSE_WRITE | IN_MOVED_TO)`，事件驱动取代轮询 —— `IN_CLOSE_WRITE` 天然规避"写到一半被读"的问题
-2. 配合一个 staging file pattern：写入方先写 `xxx.tmp` 再 `rename()` 成 `xxx.xml`（rename 是原子的）
+1. 用 `inotify_add_watch(IN_CLOSE_WRITE | IN_MOVED_TO)`，事件驱动取代轮询，`IN_CLOSE_WRITE` 表示一个可写文件描述符关闭，并不保证没有其他写者或随后再次写入
+2. 配合一个 staging file pattern：写入方先写 `xxx.tmp` 再 `rename()` 成 `xxx.xml`（同一文件系统内用原子替换发布完整文件；持久性要求另行处理）
 3. parseConfig 出错时保留旧配置而不是替换成空，避免因为一次坏配置把服务搞挂
 
 另外这段代码里还有个隐蔽的 bug：
@@ -469,15 +470,10 @@ boost::unique_lock<boost::mutex>(m_mutex);    // ← 临时对象，下一行就
 boost::unique_lock<boost::mutex> lock(m_mutex);
 ```
 
-C++ 里这类"幽灵锁"是面试常考也是线上常见的真实事故。
+具名 RAII 对象会在作用域结束时析构，临时对象通常在当前完整表达式结束时就析构。检查锁的存活范围，比只看有没有写锁类型更重要。
 
-## 总结
+## 再换一台机器时，按什么顺序检查
 
-整套链路的踩坑可以归到三个层次：
+先核对依赖的架构、编译器 ABI 和生成器版本，再做全量构建；运行后检查工作线程、动态库路径和配置加载。不要把编译通过当成并发正确性的证据，缓存快照与热更新还需要独立的存储期和失败处理设计。
 
-1. **依赖版本管理**：vendored 的三方库随时间漂移，protobuf 3.7 vs brpc 头（3.21）是典型不一致；C++ 标准也是 —— glog 0.6+ 已不兼容 C++11
-2. **构建/分发产物**：Git LFS、ELF RPATH、动态库版本（libssl 3 vs 1.1）、glibc ABI —— 跨机器部署时全要考虑
-3. **运行期约束**：daemon/fork 与用户态线程的冲突、容器里 core dump 需要进宿主 namespace —— 这些都是开发期容易忽略、上线时才暴露的问题
-
-框架代码本身的设计也踩过几类典型坑：API 命名的双重否定、`volatile` 当原子用、未命名锁、轮询 + 朴素延迟做热更新。这些大都是"能跑、压测也过"，但在线上长尾流量、多写并发、跨架构部署时才暴露 —— 写无锁/热更新代码时务必把内存序、原子性、写入完成判定逐一想清楚。
-
+本文是特定工程快照的排查记录。文中的库版本和路径用于解释当时的错误；移植另一份工程时，应保留详细编译命令和产物清单，再决定是否沿用修复。
